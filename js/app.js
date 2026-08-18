@@ -68,6 +68,10 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             value: 'Thỏa thuận TNDS Tập Đoàn',
             label: 'Thỏa thuận TNDS Tập Đoàn'
+        },
+        {
+            value: 'Hợp đồng tài xế travel bus - Tập Đoàn',
+            label: 'Hợp đồng tài xế travel bus - Tập Đoàn'
         }
     ];
 
