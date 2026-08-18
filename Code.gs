@@ -1,7 +1,8 @@
 // ==========================================
 // CẤU HÌNH GOOGLE SHEETS - APP NHÂN SỰ ĐI XANH
+// Phiên bản chỉ sử dụng đúng 4 sheet:
+//   MAIN, PHAN_QUYEN, HOP_DONG_MOI, PHU_LUC_HOP_DONG
 // ==========================================
-// Không ghi trực tiếp ID Google Sheet vào repository.
 // Trong Apps Script, tạo Script Property:
 //   Key: SPREADSHEET_ID
 //   Value: ID của file Google Sheets cần kết nối.
@@ -9,34 +10,28 @@ const SPREADSHEET_ID_PROPERTY = 'SPREADSHEET_ID';
 
 const SHEETS = Object.freeze({
   MAIN: 'MAIN',
-  TAI_KHOAN: 'TAI_KHOAN',
-  HOP_DONG: 'HOP_DONG',
-  PHU_LUC_HOP_DONG: 'PHU_LUC_HOP_DONG',
-  THONG_TIN_BO_SUNG: 'THONG_TIN_BO_SUNG',
-  KHAM_SUC_KHOE: 'KHAM_SUC_KHOE',
-  BAO_HIEM: 'BAO_HIEM',
-  FILE_DINH_KEM: 'FILE_DINH_KEM',
-  NHAP_XUAT_DONG_PHUC: 'NHAP_XUAT_DONG_PHUC',
-  KHO_TAI_SAN: 'KHO_TAI_SAN',
-  NHAP_XUAT_TAI_SAN: 'NHAP_XUAT_TAI_SAN'
+  PHAN_QUYEN: 'PHAN_QUYEN',
+  HOP_DONG_MOI: 'HOP_DONG_MOI',
+  PHU_LUC_HOP_DONG: 'PHU_LUC_HOP_DONG'
 });
 
-// Những cột này luôn lấy từ MAIN, không cho bảng phụ ghi đè.
+// Những cột này luôn lấy từ MAIN, bảng hợp đồng/phụ lục không được ghi đè.
 const PROTECTED_MAIN_FIELDS = Object.freeze([
-  'id', 'id_main', 'idNhanSu', 'maNV', 'hoTen', 'hoTenMaNV'
+  'id', 'ID', 'ID_NV', 'HO_TEN_MA_NV', 'id_main', 'idNhanSu'
 ]);
 
 // ==========================================
 // API ENDPOINT
-// URL mẫu:
-// /exec?id=<MAIN.id>&hopDongId=<HOP_DONG.id>&template=<ten_template>
-//      &username=<user>&password=<pass>
+// GET:
+// /exec?id=<MAIN.ID_NV>&hopDongId=<HOP_DONG_MOI.id>
+//      &template=<ten_template>&username=<user>&password=<pass>
+//
+// Nên ưu tiên POST để không đưa mật khẩu lên URL.
 // ==========================================
 function doGet(e) {
   return handleRequest_((e && e.parameter) || {});
 }
 
-// Có thể dùng POST nếu sau này frontend không muốn đặt mật khẩu trên URL.
 function doPost(e) {
   let params = (e && e.parameter) || {};
 
@@ -57,6 +52,8 @@ function doPost(e) {
 
 function handleRequest_(params) {
   try {
+    params = params || {};
+
     const id = clean_(params.id);
     const requestedHopDongId = clean_(params.hopDongId);
     const template = clean_(params.template) || 'ho_so_nhan_su';
@@ -74,7 +71,7 @@ function handleRequest_(params) {
     if (!id) {
       return jsonOutput_({
         success: false,
-        message: "Thiếu tham số 'id'. Giá trị này phải là MAIN.id."
+        message: "Thiếu tham số 'id'. Giá trị này phải là MAIN.ID_NV."
       });
     }
 
@@ -89,13 +86,12 @@ function handleRequest_(params) {
       });
     }
 
-    // MAIN.id là khóa chính duy nhất của API.
-    const main = findOneInSheetByField_(ss, SHEETS.MAIN, 'id', id);
+    const main = findOneInSheetByField_(ss, SHEETS.MAIN, 'ID_NV', id);
 
     if (!main) {
       return jsonOutput_({
         success: false,
-        message: 'Không tìm thấy nhân sự có MAIN.id: ' + id
+        message: 'Không tìm thấy nhân sự có MAIN.ID_NV: ' + id
       });
     }
 
@@ -106,9 +102,9 @@ function handleRequest_(params) {
       success: true,
       template: template,
       id: id,
-      hopDongId: clean_(related.hopDongHienTai.id),
+      hopDongId: clean_(getFieldValue_(related.hopDongHienTai, 'id')),
       requested_hop_dong_id: requestedHopDongId,
-      key_source: 'MAIN.id',
+      key_source: 'MAIN.ID_NV',
       data: mergedData
     };
 
@@ -135,24 +131,27 @@ function handleRequest_(params) {
 }
 
 // ==========================================
-// XÁC THỰC
-// Sheet TAI_KHOAN dùng cột: user, pass, trangThai
+// XÁC THỰC TRÊN SHEET PHAN_QUYEN
+// Các cột bắt buộc: user, pass
+// Cột tùy chọn: trangThai
 // ==========================================
 function authenticate_(ss, username, password) {
   const inputUser = clean_(username);
   const inputPass = clean_(password);
   const accounts = findRowsInSheetByField_(
     ss,
-    SHEETS.TAI_KHOAN,
+    SHEETS.PHAN_QUYEN,
     'user',
     inputUser
   );
 
   for (let i = 0; i < accounts.length; i++) {
     const account = accounts[i];
-    const sheetUser = clean_(account.user);
-    const sheetPass = clean_(account.pass);
-    const status = clean_(account.trangThai).toLowerCase();
+    const sheetUser = clean_(getFieldValue_(account, 'user'));
+    const sheetPass = clean_(getFieldValue_(account, 'pass'));
+    const status = clean_(
+      getFieldValue_(account, ['trangThai', 'trang_thai'])
+    ).toLowerCase();
 
     if (sheetUser === inputUser && sheetPass === inputPass) {
       if (status && status !== 'còn hoạt động') {
@@ -177,14 +176,16 @@ function authenticate_(ss, username, password) {
 
 // ==========================================
 // ĐỌC VÀ LIÊN KẾT DỮ LIỆU
-// Tất cả bảng nghiệp vụ liên kết với MAIN bằng id_main.
+// Liên kết dữ liệu:
+//   MAIN.ID_NV = HOP_DONG_MOI.ID_MAIN
+//   MAIN.ID_NV = PHU_LUC_HOP_DONG.PLHD_CUA_NV
 // ==========================================
 function loadRelatedData_(ss, main, requestedHopDongId) {
-  const mainId = clean_(main.id);
+  const mainId = clean_(getFieldValue_(main, ['ID_NV', 'id_nv']));
 
   const allHopDongList = findRowsInSheetByField_(
     ss,
-    SHEETS.HOP_DONG,
+    SHEETS.HOP_DONG_MOI,
     'id_main',
     mainId
   );
@@ -195,78 +196,30 @@ function loadRelatedData_(ss, main, requestedHopDongId) {
     requestedHopDongId
   );
 
+  const hopDongHienTai = requestedHopDong ||
+    selectCurrentContract_(
+      hopDongList,
+      getFieldValue_(main, ['idHopDong', 'id_hop_dong'])
+    );
+
   const phuLucHopDongList = findRowsInSheetByField_(
     ss,
     SHEETS.PHU_LUC_HOP_DONG,
-    'id_main',
-    mainId
-  ).filter(isUsableRow_);
-
-  const thongTinBoSungList = findRowsInSheetByField_(
-    ss,
-    SHEETS.THONG_TIN_BO_SUNG,
-    'id_main',
-    mainId
-  ).filter(isUsableRow_);
-
-  const khamSucKhoeList = findRowsInSheetByField_(
-    ss,
-    SHEETS.KHAM_SUC_KHOE,
-    'id_main',
-    mainId
-  ).filter(isUsableRow_);
-
-  const baoHiemList = findRowsInSheetByField_(
-    ss,
-    SHEETS.BAO_HIEM,
-    'id_main',
-    mainId
-  ).filter(isUsableRow_);
-
-  const fileDinhKemList = findRowsInSheetByField_(
-    ss,
-    SHEETS.FILE_DINH_KEM,
-    'id_main',
-    mainId
-  ).filter(isUsableRow_);
-
-  const dongPhucList = findRowsInSheetByField_(
-    ss,
-    SHEETS.NHAP_XUAT_DONG_PHUC,
-    'id_main',
-    mainId
-  ).filter(isUsableRow_);
-
-  const khoTaiSanList = findRowsInSheetByField_(
-    ss,
-    SHEETS.KHO_TAI_SAN,
-    'id_main',
-    mainId
-  ).filter(isUsableRow_);
-
-  const nhapXuatTaiSanList = findRowsInSheetByField_(
-    ss,
-    SHEETS.NHAP_XUAT_TAI_SAN,
-    'id_main',
+    'PLHD_CUA_NV',
     mainId
   ).filter(isUsableRow_);
 
   return {
-    hopDongList: hopDongList,
-    hopDongHienTai: requestedHopDong ||
-      selectCurrentContract_(hopDongList, main.idHopDong),
-    phuLucHopDongList: sortRowsByDateDesc_(phuLucHopDongList, 'ngayHieuLucPLHD'),
-    phuLucHopDongMoiNhat: selectLatestByDate_(phuLucHopDongList, 'ngayHieuLucPLHD'),
-    thongTinBoSungList: thongTinBoSungList,
-    thongTinBoSung: thongTinBoSungList[0] || {},
-    khamSucKhoeList: sortRowsByDateDesc_(khamSucKhoeList, 'ngayKhamSucKhoe'),
-    khamSucKhoeMoiNhat: selectLatestByDate_(khamSucKhoeList, 'ngayKhamSucKhoe'),
-    baoHiemList: sortRowsByDateDesc_(baoHiemList, 'thangTangBHXH'),
-    baoHiemMoiNhat: selectLatestByDate_(baoHiemList, 'thangTangBHXH'),
-    fileDinhKemList: fileDinhKemList,
-    dongPhucList: dongPhucList,
-    khoTaiSanList: khoTaiSanList,
-    nhapXuatTaiSanList: nhapXuatTaiSanList
+    hopDongList: sortRowsByDateDesc_(hopDongList, 'ngayBatDau'),
+    hopDongHienTai: hopDongHienTai,
+    phuLucHopDongList: sortRowsByDateDesc_(
+      phuLucHopDongList,
+      'ngayHieuLucPLHD'
+    ),
+    phuLucHopDongMoiNhat: selectLatestByDate_(
+      phuLucHopDongList,
+      'ngayHieuLucPLHD'
+    )
   };
 }
 
@@ -284,7 +237,9 @@ function validateRequestedContract_(allHopDongList, requestedHopDongId) {
   }
 
   if (!isUsableRow_(contract)) {
-    const contractLabel = clean_(contract.soHD) || contractId;
+    const contractLabel = clean_(
+      getFieldValue_(contract, ['soHD', 'so_hd'])
+    ) || contractId;
     throw apiError_(
       'HOP_DONG_DA_XOA',
       'Hợp đồng ' + contractLabel + ' đã bị xóa, không thể xuất biểu mẫu.'
@@ -304,55 +259,44 @@ function selectCurrentContract_(rows, idHopDongFromMain) {
   }
 
   const activeRows = rows.filter(function(row) {
-    return clean_(row.trangThai).toLowerCase() === 'còn hiệu lực';
+    return clean_(
+      getFieldValue_(row, ['trangThai', 'trang_thai'])
+    ).toLowerCase() === 'còn hiệu lực';
   });
 
-  return selectLatestByDate_(activeRows.length ? activeRows : rows, 'ngayBatDau');
+  return selectLatestByDate_(
+    activeRows.length ? activeRows : rows,
+    'ngayBatDau'
+  );
 }
 
 // ==========================================
 // GỘP DỮ LIỆU DÙNG CHO DOCXTEMPLATER
+// Nguồn dữ liệu chỉ gồm MAIN, HOP_DONG_MOI và PHU_LUC_HOP_DONG.
 // ==========================================
 function buildEmployeeData_(main, related) {
   const data = Object.assign({}, main);
 
-  // Khóa trả về luôn là MAIN.id.
-  data.id = clean_(main.id);
-  data.id_main = clean_(main.id);
-  data.idNhanSu = clean_(main.id);
+  const mainId = clean_(getFieldValue_(main, ['ID_NV', 'id_nv']));
+  data.id = mainId;
+  data.id_main = mainId;
+  data.idNhanSu = mainId;
 
-  // Field phổ biến của hợp đồng/bằng lái/bảo hiểm được đưa ra cấp ngoài
-  // để template có thể dùng trực tiếp {{soHD}}, {{loaiHD}}, {{thongTinBLX}}...
+  // Đưa field hợp đồng và phụ lục mới nhất ra cấp ngoài.
   mergeNonBlank_(data, related.hopDongHienTai, PROTECTED_MAIN_FIELDS);
-  mergeNonBlank_(data, related.thongTinBoSung, PROTECTED_MAIN_FIELDS);
-  mergeNonBlank_(data, related.baoHiemMoiNhat, PROTECTED_MAIN_FIELDS);
-  mergeNonBlank_(data, related.khamSucKhoeMoiNhat, PROTECTED_MAIN_FIELDS);
   mergeNonBlank_(data, related.phuLucHopDongMoiNhat, PROTECTED_MAIN_FIELDS);
 
-  // Đồng thời sinh field có tiền tố để tránh nhầm nguồn dữ liệu.
+  // Sinh thêm field có tiền tố để template phân biệt nguồn dữ liệu.
   addPrefixedFields_(data, 'main_', main);
   addPrefixedFields_(data, 'hopDong_', related.hopDongHienTai);
-  addPrefixedFields_(data, 'thongTinBoSung_', related.thongTinBoSung);
-  addPrefixedFields_(data, 'baoHiem_', related.baoHiemMoiNhat);
-  addPrefixedFields_(data, 'khamSucKhoe_', related.khamSucKhoeMoiNhat);
   addPrefixedFields_(data, 'phuLucHopDong_', related.phuLucHopDongMoiNhat);
 
-  // Các mảng có thể dùng trong vòng lặp Docxtemplater.
+  // Các mảng dùng cho vòng lặp Docxtemplater.
   data.danhSachHopDong = related.hopDongList;
   data.danhSachPhuLucHopDong = related.phuLucHopDongList;
-  data.danhSachThongTinBoSung = related.thongTinBoSungList;
-  data.danhSachKhamSucKhoe = related.khamSucKhoeList;
-  data.danhSachBaoHiem = related.baoHiemList;
-  data.danhSachFileDinhKem = related.fileDinhKemList;
-  data.danhSachDongPhuc = related.dongPhucList;
-  data.danhSachKhoTaiSan = related.khoTaiSanList;
-  data.danhSachNhapXuatTaiSan = related.nhapXuatTaiSanList;
 
   data.soLuongHopDong = related.hopDongList.length;
   data.soLuongPhuLucHopDong = related.phuLucHopDongList.length;
-  data.soLuongFileDinhKem = related.fileDinhKemList.length;
-  data.soLuongDongPhuc = related.dongPhucList.length;
-  data.soLuongTaiSan = related.khoTaiSanList.length + related.nhapXuatTaiSanList.length;
 
   return normalizeForJson_(data);
 }
@@ -362,11 +306,14 @@ function mergeNonBlank_(target, source, protectedFields) {
 
   const protectedMap = {};
   (protectedFields || []).forEach(function(key) {
-    protectedMap[key] = true;
+    protectedMap[normalizeFieldName_(key)] = true;
   });
 
   Object.keys(source).forEach(function(key) {
-    if (!protectedMap[key] && !isBlank_(source[key])) {
+    if (
+      !protectedMap[normalizeFieldName_(key)] &&
+      !isBlank_(source[key])
+    ) {
       target[key] = source[key];
     }
   });
@@ -385,23 +332,28 @@ function addPrefixedFields_(target, prefix, source) {
 function buildWarnings_(main, related) {
   const warnings = [];
 
-  if (!related.hopDongHienTai || !clean_(related.hopDongHienTai.id)) {
-    warnings.push('Không tìm thấy hợp đồng liên kết cho nhân sự ' + clean_(main.maNV));
-  }
-
-  if (!related.thongTinBoSung || !clean_(related.thongTinBoSung.id)) {
-    warnings.push('Nhân sự chưa có dữ liệu trong THONG_TIN_BO_SUNG');
+  if (
+    !related.hopDongHienTai ||
+    !clean_(getFieldValue_(related.hopDongHienTai, 'id'))
+  ) {
+    warnings.push(
+      'Không tìm thấy hợp đồng liên kết cho nhân sự ' +
+      (clean_(getFieldValue_(main, ['maNV', 'ma_nv'])) ||
+        clean_(getFieldValue_(main, ['ID_NV', 'id_nv'])))
+    );
   }
 
   return warnings;
 }
 
 // ==========================================
-// HÀM ĐỌC SHEET TỐI ƯU THEO KHÓA
+// HÀM ĐỌC GOOGLE SHEETS
 // ==========================================
 function openConfiguredSpreadsheet_() {
   const spreadsheetId = clean_(
-    PropertiesService.getScriptProperties().getProperty(SPREADSHEET_ID_PROPERTY)
+    PropertiesService.getScriptProperties().getProperty(
+      SPREADSHEET_ID_PROPERTY
+    )
   );
 
   if (!spreadsheetId) {
@@ -429,13 +381,17 @@ function findRowsInSheetByField_(ss, sheetName, fieldName, value) {
   const lastColumn = sheet.getLastColumn();
   if (lastRow < 2 || lastColumn < 1) return [];
 
-  const headers = sheet.getRange(1, 1, 1, lastColumn)
+  const headers = sheet
+    .getRange(1, 1, 1, lastColumn)
     .getDisplayValues()[0]
     .map(function(header) {
       return clean_(header);
     });
 
-  const fieldIndex = headers.indexOf(fieldName);
+  const normalizedFieldName = normalizeFieldName_(fieldName);
+  const fieldIndex = headers.findIndex(function(header) {
+    return normalizeFieldName_(header) === normalizedFieldName;
+  });
   if (fieldIndex === -1) {
     throw new Error('Sheet ' + sheetName + ' không có cột ' + fieldName);
   }
@@ -455,7 +411,7 @@ function findRowsInSheetByField_(ss, sheetName, fieldName, value) {
   });
 
   return matchedRowNumbers.map(function(rowNumber) {
-    // getDisplayValues giữ nguyên ngày, giờ, tiền giống dữ liệu đang hiển thị.
+    // getDisplayValues giữ nguyên cách ngày, giờ và tiền đang hiển thị.
     const row = sheet
       .getRange(rowNumber, 1, 1, lastColumn)
       .getDisplayValues()[0];
@@ -473,16 +429,26 @@ function findByField_(rows, fieldName, value) {
   const target = clean_(value);
   if (!target) return null;
 
-  for (let i = 0; i < rows.length; i++) {
-    if (clean_(rows[i][fieldName]) === target) return rows[i];
+  for (let i = 0; i < (rows || []).length; i++) {
+    if (clean_(getFieldValue_(rows[i], fieldName)) === target) return rows[i];
   }
 
   return null;
 }
 
 function isUsableRow_(row) {
-  const deletedState = clean_(row.trang_thai || row.trang_thai_xoa || row.xoa_row).toLowerCase();
-  return deletedState !== 'delete' && deletedState !== 'đã xóa' && deletedState !== 'đã xoá';
+  const deletedState = clean_(
+    getFieldValue_(row, [
+      'trang_thai',
+      'trang_thai_xoa',
+      'trangThaiXoa',
+      'xoa_row'
+    ])
+  ).toLowerCase();
+
+  return deletedState !== 'delete' &&
+    deletedState !== 'đã xóa' &&
+    deletedState !== 'đã xoá';
 }
 
 function apiError_(code, message) {
@@ -501,7 +467,8 @@ function selectLatestByDate_(rows, fieldName) {
 
 function sortRowsByDateDesc_(rows, fieldName) {
   return (rows || []).slice().sort(function(a, b) {
-    return parseDateValue_(b[fieldName]) - parseDateValue_(a[fieldName]);
+    return parseDateValue_(getFieldValue_(b, fieldName)) -
+      parseDateValue_(getFieldValue_(a, fieldName));
   });
 }
 
@@ -511,12 +478,20 @@ function parseDateValue_(value) {
   const text = clean_(value);
   let match = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
   if (match) {
-    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1])).getTime();
+    return new Date(
+      Number(match[3]),
+      Number(match[2]) - 1,
+      Number(match[1])
+    ).getTime();
   }
 
   match = text.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
   if (match) {
-    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getTime();
+    return new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3])
+    ).getTime();
   }
 
   return 0;
@@ -524,7 +499,11 @@ function parseDateValue_(value) {
 
 function normalizeForJson_(value) {
   if (value instanceof Date) {
-    return Utilities.formatDate(value, 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy');
+    return Utilities.formatDate(
+      value,
+      'Asia/Ho_Chi_Minh',
+      'dd/MM/yyyy'
+    );
   }
 
   if (Array.isArray(value)) {
@@ -551,6 +530,45 @@ function clean_(value) {
     .trim();
 }
 
+/**
+ * Chuẩn hóa tên cột để các dạng USER/user, ID_MAIN/id_main,
+ * TRANG_THAI/trangThai đều được xem là cùng một field.
+ */
+function normalizeFieldName_(value) {
+  return clean_(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Lấy giá trị object theo tên cột nhưng không phân biệt hoa/thường,
+ * dấu cách, dấu gạch dưới hoặc kiểu camelCase.
+ */
+function getFieldValue_(row, fieldNames) {
+  if (!row || typeof row !== 'object') return undefined;
+
+  const names = Array.isArray(fieldNames) ? fieldNames : [fieldNames];
+  const normalizedKeys = {};
+
+  Object.keys(row).forEach(function(key) {
+    const normalizedKey = normalizeFieldName_(key);
+    if (!Object.prototype.hasOwnProperty.call(normalizedKeys, normalizedKey)) {
+      normalizedKeys[normalizedKey] = key;
+    }
+  });
+
+  for (let i = 0; i < names.length; i++) {
+    const matchedKey = normalizedKeys[normalizeFieldName_(names[i])];
+    if (matchedKey !== undefined) return row[matchedKey];
+  }
+
+  return undefined;
+}
+
 function isBlank_(value) {
   return value === null || value === undefined || clean_(value) === '';
 }
@@ -559,4 +577,195 @@ function jsonOutput_(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ==========================================
+// HÀM TEST - CHỈ ĐỌC DỮ LIỆU, KHÔNG GHI/XÓA SHEET
+// ==========================================
+
+/**
+ * Kiểm tra 4 sheet và các cột tối thiểu mà API cần sử dụng.
+ */
+function testCauHinh4Sheet() {
+  const ss = openConfiguredSpreadsheet_();
+  const requirements = {};
+  requirements[SHEETS.MAIN] = ['ID_NV'];
+  requirements[SHEETS.PHAN_QUYEN] = ['user', 'pass'];
+  requirements[SHEETS.HOP_DONG_MOI] = ['id', 'id_main'];
+  requirements[SHEETS.PHU_LUC_HOP_DONG] = ['PLHD_CUA_NV'];
+
+  const result = [];
+
+  Object.keys(requirements).forEach(function(sheetName) {
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      result.push({
+        sheet: sheetName,
+        success: false,
+        message: 'Không tìm thấy sheet'
+      });
+      return;
+    }
+
+    const lastColumn = sheet.getLastColumn();
+    const headers = lastColumn > 0
+      ? sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0].map(clean_)
+      : [];
+
+    const missingColumns = requirements[sheetName].filter(function(column) {
+      const normalizedColumn = normalizeFieldName_(column);
+      return !headers.some(function(header) {
+        return normalizeFieldName_(header) === normalizedColumn;
+      });
+    });
+
+    result.push({
+      sheet: sheetName,
+      success: missingColumns.length === 0,
+      missingColumns: missingColumns
+    });
+  });
+
+  const success = result.every(function(item) {
+    return item.success;
+  });
+
+  const summary = {
+    success: success,
+    spreadsheetIdConfigured: true,
+    sheets: result
+  };
+
+  Logger.log(JSON.stringify(summary, null, 2));
+
+  if (!success) {
+    throw new Error('Cấu hình 4 sheet chưa hợp lệ. Xem Execution log.');
+  }
+
+  return summary;
+}
+
+/**
+ * Smoke test API bằng dữ liệu thật.
+ * Tạo các Script Properties trước khi chạy:
+ *   TEST_MAIN_ID       : MAIN.ID_NV dùng để test
+ *   TEST_USERNAME      : PHAN_QUYEN.user dùng để test
+ *   TEST_PASSWORD      : PHAN_QUYEN.pass dùng để test
+ *   TEST_HOP_DONG_ID   : không bắt buộc
+ *   TEST_TEMPLATE      : không bắt buộc
+ */
+function testApiThucTe() {
+  const properties = PropertiesService.getScriptProperties();
+  const params = {
+    id: clean_(properties.getProperty('TEST_MAIN_ID')),
+    username: clean_(properties.getProperty('TEST_USERNAME')),
+    password: clean_(properties.getProperty('TEST_PASSWORD')),
+    hopDongId: clean_(properties.getProperty('TEST_HOP_DONG_ID')),
+    template: clean_(properties.getProperty('TEST_TEMPLATE')) ||
+      'ho_so_nhan_su'
+  };
+
+  const missing = [];
+  if (!params.id) missing.push('TEST_MAIN_ID');
+  if (!params.username) missing.push('TEST_USERNAME');
+  if (!params.password) missing.push('TEST_PASSWORD');
+
+  if (missing.length) {
+    throw new Error(
+      'Thiếu Script Properties phục vụ test: ' + missing.join(', ')
+    );
+  }
+
+  const output = handleRequest_(params);
+  const response = JSON.parse(output.getContent());
+
+  // Không ghi username/password vào log.
+  Logger.log(JSON.stringify(response, null, 2));
+
+  if (!response.success) {
+    throw new Error('API test thất bại: ' + response.message);
+  }
+
+  return response;
+}
+
+/**
+ * Test nhánh chặn request thiếu thông tin đăng nhập.
+ * Hàm này không cần kết nối Google Sheet.
+ */
+function testApiThieuDangNhap() {
+  const output = handleRequest_({ id: 'TEST_ID' });
+  const response = JSON.parse(output.getContent());
+
+  const passed = response.success === false &&
+    response.auth_failed === true &&
+    response.message === 'Yêu cầu đăng nhập.';
+
+  Logger.log(JSON.stringify({
+    success: passed,
+    response: response
+  }, null, 2));
+
+  if (!passed) {
+    throw new Error('Test thiếu đăng nhập không đạt.');
+  }
+
+  return response;
+}
+
+/**
+ * Chạy lần lượt các test an toàn.
+ * testApiThucTe chỉ chạy khi đã có đủ TEST_* Script Properties.
+ */
+function testTatCa() {
+  const tests = [
+    { name: 'testApiThieuDangNhap', fn: testApiThieuDangNhap },
+    { name: 'testCauHinh4Sheet', fn: testCauHinh4Sheet }
+  ];
+
+  const properties = PropertiesService.getScriptProperties();
+  if (
+    clean_(properties.getProperty('TEST_MAIN_ID')) &&
+    clean_(properties.getProperty('TEST_USERNAME')) &&
+    clean_(properties.getProperty('TEST_PASSWORD'))
+  ) {
+    tests.push({ name: 'testApiThucTe', fn: testApiThucTe });
+  }
+
+  const results = [];
+
+  tests.forEach(function(test) {
+    try {
+      test.fn();
+      results.push({ name: test.name, success: true });
+    } catch (error) {
+      results.push({
+        name: test.name,
+        success: false,
+        message: error.message
+      });
+    }
+  });
+
+  const failed = results.filter(function(item) {
+    return !item.success;
+  });
+
+  const summary = {
+    success: failed.length === 0,
+    total: results.length,
+    passed: results.length - failed.length,
+    failed: failed.length,
+    results: results
+  };
+
+  Logger.log(JSON.stringify(summary, null, 2));
+
+  if (failed.length) {
+    throw new Error(
+      'Có ' + failed.length + ' test thất bại. Xem Execution log.'
+    );
+  }
+
+  return summary;
 }
