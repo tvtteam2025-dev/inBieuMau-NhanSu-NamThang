@@ -38,8 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
     Mỗi đơn vị chỉ nhìn thấy template dùng chung và template riêng của đơn vị đó.
     const TNM_TEMPLATES = [
         {
-            value: 'TNM-danhgiathuviec',
-            label: '1. TNM - Đánh giá thử việc'
+            value: 'HĐ HTKD - Lái xe taxi - Tập Đoàn',
+            label: 'Hợp Đồng Hợp Tác Kinh Doanh Lái Xe Taxi'
         }
     ];
 
