@@ -32,6 +32,42 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             value: 'HĐ HTKD - Lái xe taxi - Tập Đoàn',
             label: 'HĐ HTKD - Lái xe taxi - Tập Đoàn'
+        },
+        {
+            value: 'HĐLĐ có thời hạn - Lái xe taxi - Tập Đoàn',
+            label: 'HĐLĐ có thời hạn - Lái xe taxi - Tập Đoàn'
+        },
+        {
+            value: 'HĐLĐ có thời hạn - văn phòng - Tập Đoàn',
+            label: 'HĐLĐ có thời hạn - văn phòng - Tập Đoàn'
+        },
+        {
+            value: 'HĐLĐ không thời hạn - văn phòng - Tập Đoàn',
+            label: 'HĐLĐ không thời hạn - văn phòng - Tập Đoàn'
+        },
+        {
+            value: 'Hợp đồng dịch vụ - văn phòng -Tập Đoàn',
+            label: 'Hợp đồng dịch vụ - văn phòng -Tập Đoàn'
+        },
+        {
+            value: 'Hợp đồng thử việc - Lái xe bus - Tập Đoàn',
+            label: 'Hợp đồng thử việc - Lái xe bus - Tập Đoàn'
+        },
+        {
+            value: 'Hợp đồng thử việc - Lái xe taxi - Phú Quốc',
+            label: 'Hợp đồng thử việc - Lái xe taxi - Phú Quốc'
+        },
+        {
+            value: 'Hợp đồng thử việc - Lái Xe taxi - Tập Đoàn',
+            label: 'Hợp đồng thử việc - Lái Xe taxi - Tập Đoàn'
+        },
+        {
+            value: 'Hợp đồng thử việc - văn phòng - Tập Đoàn',
+            label: 'Hợp đồng thử việc - văn phòng - Tập Đoàn'
+        },
+        {
+            value: 'Thỏa thuận TNDS Tập Đoàn',
+            label: 'Thỏa thuận TNDS Tập Đoàn'
         }
     ];
 
