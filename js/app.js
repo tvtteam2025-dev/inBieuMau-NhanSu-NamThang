@@ -71,27 +71,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     ];
 
-    // Mỗi đơn vị chỉ nhìn thấy template dùng chung và template riêng của đơn vị đó.
-    // const TNM_TEMPLATES = [
-    //     {
-    //         value: 'TNM-danhgiathuviec',
-    //         label: '1. TNM - Đánh giá thử việc'
-    //     }
-    // ];
+    Mỗi đơn vị chỉ nhìn thấy template dùng chung và template riêng của đơn vị đó.
+    const TNM_TEMPLATES = [
+        {
+            value: 'TNM-danhgiathuviec',
+            label: '1. TNM - Đánh giá thử việc'
+        }
+    ];
 
-    // const COMPANY_TEMPLATES = {
-    //     'CÔNG TY TNHH ĐI XANH': [
-    //         {
-    //             value: 'DX-danhgiathuviec',
-    //             label: '1. Đi Xanh - Đánh giá thử việc'
-    //         }
-    //     ],
+    const COMPANY_TEMPLATES = {
+        'CÔNG TY TNHH ĐI XANH': [
+            {
+                value: 'DX-danhgiathuviec',
+                label: '1. Đi Xanh - Đánh giá thử việc'
+            }
+        ],
 
-    //     'CÔNG TY TNHH TM DV TRƯỜNG NHẬT MINH': TNM_TEMPLATES,
+        'CÔNG TY TNHH TM DV TRƯỜNG NHẬT MINH': TNM_TEMPLATES,
 
-    //     // Giữ alias này để không lỗi nếu dữ liệu cũ trong Sheet đang ghi "NHẤT".
-    //     'CÔNG TY TNHH TM DV TRƯỜNG NHẤT MINH': TNM_TEMPLATES
-    // };
+        // Giữ alias này để không lỗi nếu dữ liệu cũ trong Sheet đang ghi "NHẤT".
+        'CÔNG TY TNHH TM DV TRƯỜNG NHẤT MINH': TNM_TEMPLATES
+    };
 
     function normalizeCompanyName(value) {
         return String(value || '')
