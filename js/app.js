@@ -30,16 +30,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const COMMON_TEMPLATES = [
         // Ví dụ:
         {
-            value: 'HĐ HTKD - Lái xe taxi - Tập Đoàn',
-            label: 'Hợp Đồng Hợp Tác Kinh Doanh Lái Xe Taxi'
+            value: 'COMMON-camketbaomatthongtin',
+            label: 'Cam kết bảo mật thông tin'
         }
     ];
 
-    Mỗi đơn vị chỉ nhìn thấy template dùng chung và template riêng của đơn vị đó.
+    // Mỗi đơn vị chỉ nhìn thấy template dùng chung và template riêng của đơn vị đó.
     const TNM_TEMPLATES = [
         {
-            value: 'HĐ HTKD - Lái xe taxi - Tập Đoàn',
-            label: 'Hợp Đồng Hợp Tác Kinh Doanh Lái Xe Taxi'
+            value: 'TNM-danhgiathuviec',
+            label: '1. TNM - Đánh giá thử việc'
         }
     ];
 
