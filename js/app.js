@@ -30,8 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const COMMON_TEMPLATES = [
         // Ví dụ:
         {
-            value: 'COMMON-camketbaomatthongtin',
-            label: 'Cam kết bảo mật thông tin'
+            value: 'HĐ HTKD - Lái xe taxi - Tập Đoàn',
+            label: 'HĐ HTKD - Lái xe taxi - Tập Đoàn'
         }
     ];
 
